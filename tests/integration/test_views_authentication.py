@@ -288,6 +288,33 @@ def test_authentication_complete_device_usable__user_disabled(
 
 
 @pytest.mark.django_db
+def test_authentication_complete__device_does_not_exist(api_client, user):
+    """Test that the authentication complete view returns appropriate 404 responses if it cannot find a credential with a matching credential_id."""
+    # Mark the user as inactive - this will prevent the authentication from
+    # succeeding once we identify the Passkey belongs to a disabled user
+    user.is_active = False
+    user.save()
+
+    payload, credential, session = setup_complete_authentication(
+        api_client=api_client, user=user
+    )
+
+    # Bye bye credential
+    credential.delete()
+
+    response = api_client.post(
+        reverse("otp_webauthn:credential-authentication-complete"),
+        data=payload,
+        format="json",
+    )
+    assert response.status_code == 404
+    assert response.data["detail"].code == "credential_not_found"
+    session = api_client.session
+    assert "otp_webauthn_authentication_state" not in session
+    assert "otp_device_id" not in session
+
+
+@pytest.mark.django_db
 def test_authentication_complete_get_success_url__understands_next_url_parameter(
     api_client, user
 ):

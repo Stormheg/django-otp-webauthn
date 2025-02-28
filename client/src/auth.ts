@@ -85,10 +85,12 @@ import {
         return;
       }
 
+      const optionsJSON = await response.json();
+
       let attResp;
       try {
         attResp = await startAuthentication({
-          optionsJSON: await response.json(),
+          optionsJSON: optionsJSON,
           useBrowserAutofill: true,
         });
       } catch (error: unknown) {
@@ -148,6 +150,36 @@ import {
 
       // Wait for the results of verification
       const verificationJSON = await verificationResp.json();
+
+      // Check for an error indicating Passkey does not exist on server
+      if (verificationResp.status === 404 && "detail" in verificationJSON) {
+        // TypeScript doesn't know about signalUnknownCredential yet
+        // FIXME: use proper typing when it lands
+        if (
+          // @ts-expect-error
+          typeof PublicKeyCredential.signalUnknownCredential !== "undefined"
+        ) {
+          // Signal the browser that the credential is unknown - which should
+          // trigger browsers implementing the signal to show a dialog to the
+          // user to remove the credential.
+          // @ts-expect-error
+          await PublicKeyCredential.signalUnknownCredential({
+            rpId: optionsJSON.rpId,
+            credentialId: attResp.rawId,
+          })
+            .then(() =>
+              console.log(
+                "Called PublicKeyCredential.signalUnknownCredential",
+              ),
+            )
+            .catch((error: Error) => {
+              console.error(
+                "Error signaling unknown credential to browser",
+                error,
+              );
+            });
+        }
+      }
 
       // Handle failed verification
       if (!verificationResp.ok && "detail" in verificationJSON) {
@@ -256,11 +288,12 @@ import {
           return;
         }
 
+        const optionsJSON = await response.json();
         let attResp;
 
         try {
           attResp = await startAuthentication({
-            optionsJSON: await response.json(),
+            optionsJSON: optionsJSON,
             useBrowserAutofill: false,
           });
         } catch (error: unknown) {
@@ -307,8 +340,8 @@ import {
                 bubbles: true,
               }),
             );
-            return;
           }
+          return;
         }
 
         await setPasskeyVerifyState({
@@ -365,6 +398,36 @@ import {
 
         // Wait for the results of verification
         const verificationJSON = await verificationResp.json();
+
+        // Check for an error indicating Passkey does not exist on server
+        if (verificationResp.status === 404 && "detail" in verificationJSON) {
+          // TypeScript doesn't know about signalUnknownCredential yet
+          // FIXME: use proper typing when it lands
+          if (
+            // @ts-expect-error
+            typeof PublicKeyCredential.signalUnknownCredential !== "undefined"
+          ) {
+            // Signal the browser that the credential is unknown - which should
+            // trigger browsers implementing the signal to show a dialog to the
+            // user to remove the credential.
+            // @ts-expect-error
+            await PublicKeyCredential.signalUnknownCredential({
+              rpId: optionsJSON.rpId,
+              credentialId: attResp.rawId,
+            })
+              .then(() =>
+                console.log(
+                  "Called PublicKeyCredential.signalUnknownCredential",
+                ),
+              )
+              .catch((error: Error) => {
+                console.error(
+                  "Error signaling unknown credential to browser",
+                  error,
+                );
+              });
+          }
+        }
 
         if (!verificationResp.ok) {
           const msg =
